@@ -106,9 +106,11 @@ type testResponseWriter struct {
 func (rw *testResponseWriter) Header() http.Header {
 	return rw.writer.Header()
 }
+
 func (rw *testResponseWriter) Write(b []byte) (int, error) {
 	return rw.writer.Write(b)
 }
+
 func (rw *testResponseWriter) WriteHeader(statusCode int) {
 	rw.writer.WriteHeader(statusCode)
 }
@@ -176,19 +178,17 @@ func TestSDKIntegration(t *testing.T) {
 	assertSpan(t, sr.Ended()[0],
 		"/user/{id:[0-9]+}",
 		trace.SpanKindServer,
-		attribute.String("http.server_name", "foobar"),
+		attribute.String("net.host.name", "foobar"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.method", "GET"),
-		attribute.String("http.target", "/user/123"),
 		attribute.String("http.route", "/user/{id:[0-9]+}"),
 	)
 	assertSpan(t, sr.Ended()[1],
 		"/book/{title}",
 		trace.SpanKindServer,
-		attribute.String("http.server_name", "foobar"),
+		attribute.String("net.host.name", "foobar"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.method", "GET"),
-		attribute.String("http.target", "/book/foo"),
 		attribute.String("http.route", "/book/{title}"),
 	)
 }
@@ -224,19 +224,17 @@ func TestSDKIntegrationWithFilters(t *testing.T) {
 	assertSpan(t, sr.Ended()[0],
 		"/user/{id:[0-9]+}",
 		trace.SpanKindServer,
-		attribute.String("http.server_name", "foobar"),
+		attribute.String("net.host.name", "foobar"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.method", "GET"),
-		attribute.String("http.target", "/user/123"),
 		attribute.String("http.route", "/user/{id:[0-9]+}"),
 	)
 	assertSpan(t, sr.Ended()[1],
 		"/book/{title}",
 		trace.SpanKindServer,
-		attribute.String("http.server_name", "foobar"),
+		attribute.String("net.host.name", "foobar"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.method", "GET"),
-		attribute.String("http.target", "/book/foo"),
 		attribute.String("http.route", "/book/{title}"),
 	)
 }
@@ -267,19 +265,17 @@ func TestSDKIntegrationWithChiRoutes(t *testing.T) {
 	assertSpan(t, sr.Ended()[0],
 		"/user/{id:[0-9]+}",
 		trace.SpanKindServer,
-		attribute.String("http.server_name", "foobar"),
+		attribute.String("net.host.name", "foobar"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.method", "GET"),
-		attribute.String("http.target", "/user/123"),
 		attribute.String("http.route", "/user/{id:[0-9]+}"),
 	)
 	assertSpan(t, sr.Ended()[1],
 		"/book/{title}",
 		trace.SpanKindServer,
-		attribute.String("http.server_name", "foobar"),
+		attribute.String("net.host.name", "foobar"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.method", "GET"),
-		attribute.String("http.target", "/book/foo"),
 		attribute.String("http.route", "/book/{title}"),
 	)
 }
@@ -314,19 +310,17 @@ func TestSDKIntegrationOverrideSpanName(t *testing.T) {
 	assertSpan(t, sr.Ended()[0],
 		"overriden span name",
 		trace.SpanKindServer,
-		attribute.String("http.server_name", "foobar"),
+		attribute.String("net.host.name", "foobar"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.method", "GET"),
-		attribute.String("http.target", "/user/123"),
 		attribute.String("http.route", "/user/{id:[0-9]+}"),
 	)
 	assertSpan(t, sr.Ended()[1],
 		"/book/{title}",
 		trace.SpanKindServer,
-		attribute.String("http.server_name", "foobar"),
+		attribute.String("net.host.name", "foobar"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.method", "GET"),
-		attribute.String("http.target", "/book/foo"),
 		attribute.String("http.route", "/book/{title}"),
 	)
 }
@@ -357,24 +351,23 @@ func TestSDKIntegrationWithRequestMethodInSpanName(t *testing.T) {
 	assertSpan(t, sr.Ended()[0],
 		"GET /user/{id:[0-9]+}",
 		trace.SpanKindServer,
-		attribute.String("http.server_name", "foobar"),
+		attribute.String("net.host.name", "foobar"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.method", "GET"),
-		attribute.String("http.target", "/user/123"),
 		attribute.String("http.route", "/user/{id:[0-9]+}"),
 	)
 	assertSpan(t, sr.Ended()[1],
 		"GET /book/{title}",
 		trace.SpanKindServer,
-		attribute.String("http.server_name", "foobar"),
+		attribute.String("net.host.name", "foobar"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.method", "GET"),
-		attribute.String("http.target", "/book/foo"),
 		attribute.String("http.route", "/book/{title}"),
 	)
 }
 
 func assertSpan(t *testing.T, span sdktrace.ReadOnlySpan, name string, kind trace.SpanKind, attrs ...attribute.KeyValue) {
+	t.Helper()
 	assert.Equal(t, name, span.Name())
 	assert.Equal(t, trace.SpanKindServer, span.SpanKind())
 
