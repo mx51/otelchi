@@ -6,12 +6,11 @@ import (
 
 	"github.com/felixge/httpsnoop"
 	"github.com/go-chi/chi/v5"
-
+	otelcontrib "go.opentelemetry.io/contrib"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
-
-	otelcontrib "go.opentelemetry.io/contrib"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"go.opentelemetry.io/otel/semconv/v1.17.0/httpconv"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
@@ -20,7 +19,7 @@ const (
 )
 
 // Middleware sets up a handler to start tracing the incoming
-// requests. The serverName parameter should describe the name of the
+// requests. The service parameter should describe the name of the
 // (virtual) server handling the request.
 func Middleware(serverName string, opts ...Option) func(next http.Handler) http.Handler {
 	cfg := config{}
@@ -133,13 +132,15 @@ func (tw traceware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ctx, span := tw.tracer.Start(
-		ctx, spanName,
-		oteltrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
-		oteltrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
-		oteltrace.WithAttributes(semconv.HTTPServerAttributesFromHTTPRequest(tw.serverName, routePattern, r)...),
+	opts := []oteltrace.SpanStartOption{
+		oteltrace.WithAttributes(
+			append(
+				httpconv.ServerRequest(tw.serverName, r),
+				semconv.HTTPRoute(routePattern),
+			)...),
 		oteltrace.WithSpanKind(oteltrace.SpanKindServer),
-	)
+	}
+	ctx, span := tw.tracer.Start(ctx, spanName, opts...)
 	defer span.End()
 
 	// get recording response writer
@@ -150,21 +151,20 @@ func (tw traceware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(ctx)
 	tw.handler.ServeHTTP(rrw.writer, r)
 
-	// set span name & http route attribute if necessary
 	if len(routePattern) == 0 {
 		routePattern = chi.RouteContext(r.Context()).RoutePattern()
-		span.SetAttributes(semconv.HTTPRouteKey.String(routePattern))
+		rAttr := semconv.HTTPRoute(routePattern)
+		span.SetAttributes(rAttr)
 
 		spanName = addPrefixToSpanName(tw.reqMethodInSpanName, r.Method, routePattern)
 		span.SetName(spanName)
 	}
 
-	// set status code attribute
-	span.SetAttributes(semconv.HTTPStatusCodeKey.Int(rrw.status))
-
-	// set span status
-	spanStatus, spanMessage := semconv.SpanStatusFromHTTPStatusCode(rrw.status)
-	span.SetStatus(spanStatus, spanMessage)
+	status := rrw.status
+	span.SetStatus(httpconv.ServerStatus(rrw.status))
+	if status > 0 {
+		span.SetAttributes(semconv.HTTPStatusCode(status))
+	}
 }
 
 func addPrefixToSpanName(shouldAdd bool, prefix, spanName string) string {
